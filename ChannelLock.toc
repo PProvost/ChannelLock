@@ -1,0 +1,25 @@
+## Interface: 30000
+ 
+## Title: ChannelLock
+## Notes: A chat channel manager.
+## Author: Quaiche
+## Version: 1.0
+## X-Category: Chat
+## OptionalDeps: tekDebug
+## SavedVariables: ChannelLockDB
+
+libs\LibStub\LibStub.lua
+libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
+
+libs\AceAddon-3.0\AceAddon-3.0.lua
+libs\AceGUI-3.0\AceGUI-3.0.xml
+libs\AceConfig-3.0\AceConfig-3.0.xml
+libs\AceConsole-3.0\AceConsole-3.0.xml
+libs\AceDB-3.0\AceDB-3.0.xml
+libs\AceDBOptions-3.0\AceDBOptions-3.0.xml
+libs\AceEvent-3.0\AceEvent-3.0.xml
+libs\AceTimer-3.0\AceTimer-3.0.xml
+
+ChannelLock.lua
+ChannelLock-Config.lua
+tekKonfigAboutPanel.lua
