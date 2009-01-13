@@ -43,6 +43,7 @@ function ChannelLock:OnInitialize()
 	self.defaults = self:GetDefaults()
 	self.db = LibStub("AceDB-3.0"):New("ChannelLockDB", self.defaults, "Default")
 
+
 	self.options = self:GetOptions()
 	LibStub("AceConfig-3.0"):RegisterOptionsTable("ChannelLock", self.options )
 	LibStub("tekKonfig-AboutPanel").new(nil, "ChannelLock")
@@ -51,17 +52,17 @@ function ChannelLock:OnInitialize()
 end
 
 function ChannelLock:OnEnable()
-	self:Debug(1, "Enable - Scheduling channel check")
+	self:Debug( "Enable - Scheduling channel check")
 	self:ScheduleTimer("CheckChannels", 2)
 end
 
-function ChannelLock:Debug(level, ...)
+function ChannelLock:Debug(...)
 	if debugf then
 		self:Print(debugf, ...)
 	end
 end
 
-function ChannelLock:DebugF(level, ...)
+function ChannelLock:DebugF(...)
 	if debugf then
 		self:Print(debugf, string.format(...))
 	end
@@ -71,38 +72,28 @@ end
 function ChannelLock:CheckChannels()
 	local myChannels = self.db.profile.channels
 	for i = 1,10 do
-		self:DebugF(1, "CheckChannels - Checking channel %d", i)
 		local id, name = GetChannelName(i)
 		name = self:CleanChannelName(name)
 		if myChannels[i] and myChannels[i].name then
-			self:Debug(1, "CheckChannels - We have a configured channel for this slot")
 			if myChannels[i].name ~= name then
 				-- The wrong channel is in this slot, remove it before adding the correct one
-				self:DebugF(1, "CheckChannels - Wrong channel in slot %d. Current=%s, Expected=%s", i, tostring(name), myChannels[i].name)
 				if name then
-					self:DebugF(1, "CheckChannels - Scheduling removal of channel=%s id=%d", name, id)
 					table.insert(self.channelUpdates, { action="remove", id = i, name=name })
 				end
-				self:DebugF(1, "CheckChannels - Scheduling add of channel=%s id=%d frameIndex=%d", myChannels[i].name, i, myChannels[i].frameIndex)
 				table.insert(self.channelUpdates, { action="add", id = i, name = myChannels[i].name, frameIndex = myChannels[i].frameIndex })
-			else
-				-- The right channel is in this slot, move on
-				self:DebugF(1, "CheckChannels - %s is the correct channel for slot %d", name, i)
 			end
 		else
 			-- There should be nothing in this slot, remove it, add a stub and schedule the stub removal
 			if id > 0 and name then
-				self:DebugF(1, "CheckChannels - Slot %d (%s) should be empty. Scheduling removal of current channel.", i, name)
 				table.insert(self.channelUpdates, { action = "remove", id = i, name=name })
 			end
 
-			self:DebugF(1, "CheckChannels - Slot %d should be empty. Adding a stub for later removal", i)
 			table.insert(self.channelUpdates, { action = "add", id = i, name = "QCHANNEL"..i, frameIndex=1 })
 			table.insert(self.stubs, { action = "remove", id = i, name = "QCHANNEL"..i } )
 		end
 	end
 
-	self.processingTimer = self:ScheduleRepeatingTimer("ProcessUpdatesQueue", 1)
+	self.processingTimer = self:ScheduleRepeatingTimer("ProcessUpdatesQueue", 2)
 end
 
 function ChannelLock:ProcessUpdatesQueue()
@@ -113,19 +104,15 @@ function ChannelLock:ProcessUpdatesQueue()
 			self.stubs = nil
 			item = table.remove(self.channelUpdates, 1)
 		else
-			self:Debug(1, "ProcessUpdatesQueue - Done processing update queue")
 			self:CancelTimer(self.processingTimer)
 			return
 		end
 	end
 
-	self:DebugF(1, "ProcessUpdatesQueue - item.action=%s item.name=%s item.frameIndex=%d", item.action, tostring(item.name), item.frameIndex or 0)
 	if item.action == "add" then
 		self:JoinChannel(item.name, item.frameIndex)
 	elseif item.action == "remove" then
 		self:LeaveChannel(item.name, item.frameIndex)
-	else
-		self:DebugF(1, "Unknown action: %s", item.action)
 	end
 end
 
@@ -142,14 +129,14 @@ end
 local function NoopFilter() return true end
 
 function ChannelLock:JoinChannel(channel, frameIndex)
-	self:Debug(1, "JoinChannel - channel="..channel.." frameIndex="..frameIndex)
-	local frame = "ChatFrame"..tostring(frameIndex)
+	if not frameIndex then return end
+	local frame = _G["ChatFrame"..frameIndex]
 
 	-- ChatFrame_AddMessageEventFilter("CHAT_MSG_CHANNEL_NOTICE", NoopFilter)
 	if channel == "LookingForGroup" then SetLookingForGroup(3,5,3) end
 
 	JoinPermanentChannel(channel, nil, frameIndex, nil)
-	ChatFrame_AddChannel(_G[frame], channel)
+	ChatFrame_AddChannel(frame, channel)
 
 	if channel == "LookingForGroup" then ClearLookingForGroup() end
 	-- ChatFrame_RemoveMessageEventFilter("CHAT_MSG_CHANNEL_NOTICE", NoopFilter)
@@ -159,14 +146,10 @@ function ChannelLock:LeaveChannel(channel, frameIndex)
 	if not channel then return end
 	if not frameIndex then frameIndex = 1 end
 
-	self:DebugF(1, "LeaveChannel - %s", channel)
-	local frame = "ChatFrame"..tostring(frameIndex)
-
 	-- ChatFrame_AddMessageEventFilter("CHAT_MSG_CHANNEL_NOTICE", NoopFilter)
 	if channel == "LookingForGroup" then SetLookingForGroup(3, 5, 3) end
 	if channel == TRADE_CHANNEL_NAME and not knownTradeZones(GetZoneText) then
-		-- TODO: Schedule this for the next zone change
-		self:Debug(1, "LeaveChannel - Unable to drop the Trade channel because you are not in a trade zone.")
+		self:Debug( "LeaveChannel - Unable to drop the Trade channel because you are not in a trade zone.")
 	end
 
 	-- ChatFrame_RemoveChannel(frame, channel)
