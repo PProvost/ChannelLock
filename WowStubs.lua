@@ -1,23 +1,37 @@
 WowStubs = {}
-WowStubs.isLoggedIn = nil
-
-function geterrorhandler()
-	return function(err) print("ERROR - " .. err) end
-end
-
 WowStubs.eventMap = {}
--- TODO: make param1 be frame and if p1 is string, assume it is the "all" form
-function RaiseEvent(event, ...)
-	if not WowStubs.eventMap[event] then return end
-	for i,frame in ipairs(WowStubs.eventMap[event]) do
-		if frame.scripts["OnEvent"] then 
-			print("firing " .. event .. " on " .. tostring(frame.name))
-			pcall( frame.scripts["OnEvent"], frame, event, ... )
-		end
+WowStubs.frames = {}
+WowStubs.isLoggedIn = nil
+WowStubs.currentTime = nil
+
+-- Provide a default implementation of geterrorhandler() as provided by Wow
+function geterrorhandler()
+	return function(err) 
+		print("ERROR - " .. err) 
 	end
 end
 
-WowStubs.frames = {}
+function WowStubs:CallFrameScript(frame, script, ...)
+	if frame.scripts[script] then 
+		print("Calling " .. script .. " on " .. tostring(frame.name))
+		pcall( frame.scripts[script], frame, ... )
+	end
+end
+
+function WowStubs:RaiseEvent(event, ...)
+	if not self.eventMap[event] then return end
+	for i,frame in ipairs(self.eventMap[event]) do
+		self:CallFrameScript(frame, "OnEvent", event, ...)
+	end
+end
+
+function WowStubs:OnUpdate(elapsed)
+	if not elapsed then elapsed = 1000 end
+	for i,frame in ipairs(self.frames) do
+		self:CallFrameScript(frame, "OnUpdate", elapsed)
+	end
+end
+
 function CreateFrame(type, name, template)
 	local frame = {}
 
@@ -63,15 +77,13 @@ function CreateFrame(type, name, template)
 end
 
 function GetRealmName() return "Dragonblight" end
+function GetLocale() return "enUS" end
+function GetTime() return WowStubs.currentTime or os.time() end
+function GetChannelName(id) return 0, nil end
+function IsLoggedIn() return WowStubs.isLoggedIn end
+function InterfaceOptions_AddCategory(frame) end
 function UnitName(unit) return "Quaiche" end
 function UnitClass(unit) return "Druid", "DRUID" end
 function UnitRace(unit) return "Night Elf", "NIGHTELF" end
 function UnitFactionGroup(unit) return "Alliance" end
-function GetLocale() return "enUS" end
 
-WowStubs.currentTime = nil
-function GetTime() return WowStubs.currentTime or os.time() end
-
-function GetChannelName(id) return 0, nil end
-function IsLoggedIn() return WowStubs.isLoggedIn end
-function InterfaceOptions_AddCategory(frame) end

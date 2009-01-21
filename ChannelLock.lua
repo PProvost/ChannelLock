@@ -37,9 +37,6 @@ local knownTradeZones = {
 }
 
 function ChannelLock:OnInitialize()
-	self.channelUpdates = {}
-	self.stubs = {}
-
 	self.defaults = self:GetDefaults()
 	self.db = LibStub("AceDB-3.0"):New("ChannelLockDB", self.defaults, "Default")
 
@@ -52,6 +49,9 @@ function ChannelLock:OnInitialize()
 end
 
 function ChannelLock:OnEnable()
+	self.commandQueue = {}
+	self.deferredCommands = {}
+
 	self:Debug( "Enable - Scheduling channel check")
 	self:ScheduleTimer("CheckChannels", 2)
 end
@@ -78,18 +78,18 @@ function ChannelLock:CheckChannels()
 			if myChannels[i].name ~= name then
 				-- The wrong channel is in this slot, remove it before adding the correct one
 				if name then
-					table.insert(self.channelUpdates, { action="remove", id = i, name=name })
+					table.insert(self.commandQueue, { action="leave", id = i, name=name })
 				end
-				table.insert(self.channelUpdates, { action="add", id = i, name = myChannels[i].name, frameIndex = myChannels[i].frameIndex })
+				table.insert(self.commandQueue, { action="join", id = i, name = myChannels[i].name, frameIndex = myChannels[i].frameIndex })
 			end
 		else
 			-- There should be nothing in this slot, remove it, add a stub and schedule the stub removal
 			if id > 0 and name then
-				table.insert(self.channelUpdates, { action = "remove", id = i, name=name })
+				table.insert(self.commandQueue, { action = "leave", id = i, name=name })
 			end
 
-			table.insert(self.channelUpdates, { action = "add", id = i, name = "QCHANNEL"..i, frameIndex=1 })
-			table.insert(self.stubs, { action = "remove", id = i, name = "QCHANNEL"..i } )
+			table.insert(self.commandQueue, { action = "join", id = i, name = "QCHANNEL"..i, frameIndex=1 })
+			table.insert(self.deferredCommands, { action = "leave", id = i, name = "QCHANNEL"..i } )
 		end
 	end
 
@@ -97,21 +97,24 @@ function ChannelLock:CheckChannels()
 end
 
 function ChannelLock:ProcessUpdatesQueue()
-	local item = table.remove(self.channelUpdates, 1)
+	local item = table.remove(self.commandQueue, 1)
 	if not item then
-		if self.stubs then
-			self.channelUpdates = self.stubs
-			self.stubs = nil
-			item = table.remove(self.channelUpdates, 1)
+		if self.deferredCommands then
+			self.commandQueue = self.deferredCommands
+			self.deferredCommands = nil
+			item = table.remove(self.commandQueue, 1)
 		else
 			self:CancelTimer(self.processingTimer)
 			return
 		end
 	end
 
-	if item.action == "add" then
+	if item.action == "join" then
 		self:JoinChannel(item.name, item.frameIndex)
-	elseif item.action == "remove" then
+		table.insert(self.commandQueue, { action="addtoframe", id=item.id, name=item.name, frameIndex=item.frameIndex } )
+	elseif item.action == "addtoframe" then
+		ChatFrame_AddChannel(_G["ChatFrame"..item.frameIndex], item.name)
+	elseif item.action == "leave" then
 		self:LeaveChannel(item.name, item.frameIndex)
 	end
 end
@@ -133,12 +136,11 @@ function ChannelLock:JoinChannel(channel, frameIndex)
 	local frame = _G["ChatFrame"..frameIndex]
 
 	-- ChatFrame_AddMessageEventFilter("CHAT_MSG_CHANNEL_NOTICE", NoopFilter)
+
 	if channel == "LookingForGroup" then SetLookingForGroup(3,5,3) end
-
 	JoinPermanentChannel(channel, nil, frameIndex, nil)
-	ChatFrame_AddChannel(frame, channel)
-
 	if channel == "LookingForGroup" then ClearLookingForGroup() end
+
 	-- ChatFrame_RemoveMessageEventFilter("CHAT_MSG_CHANNEL_NOTICE", NoopFilter)
 end
 
