@@ -81,6 +81,9 @@ function ChannelLock:CheckChannels()
 					table.insert(self.commandQueue, { action="leave", id = i, name=name })
 				end
 				table.insert(self.commandQueue, { action="join", id = i, name = myChannels[i].name, frameIndex = myChannels[i].frameIndex })
+			else
+				-- Always add to frame... maybe this will help...
+				table.insert(self.commandQueue, { action="addtoframe", id=i, name=myChannels[i].name, frameIndex=myChannels[i].frameIndex } )
 			end
 		else
 			-- There should be nothing in this slot, remove it, add a stub and schedule the stub removal
@@ -104,6 +107,7 @@ function ChannelLock:ProcessUpdatesQueue()
 			self.deferredCommands = nil
 			item = table.remove(self.commandQueue, 1)
 		else
+			self:Print("Channel setup complete! You are ready to go.")
 			self:CancelTimer(self.processingTimer)
 			return
 		end
