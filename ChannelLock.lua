@@ -20,6 +20,8 @@ ChannelLock = LibStub("AceAddon-3.0"):NewAddon("ChannelLock", "AceConsole-3.0", 
 ChannelLock.revision = tonumber(("$Revision$"):match("%d+"))
 ChannelLock.date = ("$Date$"):match("%d%d%d%d%-%d%d%-%d%d")
 
+local timerDelay = 1
+
 local TRADE_CHANNEL_NAME = "Trade - City"
 local debugf = tekDebug and tekDebug:GetFrame("ChannelLock")
 
@@ -53,7 +55,7 @@ function ChannelLock:OnEnable()
 	self.deferredCommands = {}
 
 	self:Debug( "Enable - Scheduling channel check")
-	self:ScheduleTimer("CheckChannels", 2)
+	self:ScheduleTimer("CheckChannels", timerDelay)
 end
 
 function ChannelLock:Debug(...)
@@ -96,7 +98,7 @@ function ChannelLock:CheckChannels()
 		end
 	end
 
-	self.processingTimer = self:ScheduleRepeatingTimer("ProcessUpdatesQueue", 2)
+	self.processingTimer = self:ScheduleRepeatingTimer("ProcessUpdatesQueue", timerDelay)
 end
 
 function ChannelLock:ProcessUpdatesQueue()
