@@ -152,16 +152,13 @@ function ChannelLock:LeaveChannel(channel, frameIndex)
 	if not channel then return end
 	if not frameIndex then frameIndex = 1 end
 
-	-- ChatFrame_AddMessageEventFilter("CHAT_MSG_CHANNEL_NOTICE", NoopFilter)
 	if channel == "LookingForGroup" then SetLookingForGroup(3, 5, 3) end
 	if channel == TRADE_CHANNEL_NAME and not knownTradeZones(GetZoneText) then
 		self:Debug( "LeaveChannel - Unable to drop the Trade channel because you are not in a trade zone.")
 	end
 
-	-- ChatFrame_RemoveChannel(frame, channel)
 	LeaveChannelByName(channel);
 
 	if channel == "LookingForGroup" then ClearLookingForGroup() end
-	-- ChatFrame_RemoveMessageEventFilter("CHAT_MSG_CHANNEL_NOTICE", NoopFilter)
 end
 
