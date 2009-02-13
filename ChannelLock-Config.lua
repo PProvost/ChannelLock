@@ -49,7 +49,9 @@ function ChannelLock:GetOptions()
 					set = function(info, val) 
 						-- TODO - add the command the queue and fire the processor
 						local index = tostring(i)
-						if strtrim(val) == "" then val = nil end
+						if strtrim(val) == "" then 
+							self.db.profile.channels[i].empty = true
+						end
 						self.db.profile.channels[i].name = val 
 						self.options.args.channels.args[index].name = string.format("%d. %s", i, self.db.profile.channels[i].name or "")
 					end,

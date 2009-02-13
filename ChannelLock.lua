@@ -76,7 +76,7 @@ function ChannelLock:CheckChannels()
 	for i = 1,10 do
 		local id, name = GetChannelName(i)
 		name = self:CleanChannelName(name)
-		if myChannels[i] and myChannels[i].name then
+		if myChannels[i] and myChannels[i].name and not myChannels[i].empty then
 			if myChannels[i].name ~= name then
 				-- The wrong channel is in this slot, remove it before adding the correct one
 				if name then
