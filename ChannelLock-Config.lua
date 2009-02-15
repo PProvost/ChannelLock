@@ -51,6 +51,8 @@ function ChannelLock:GetOptions()
 						local index = tostring(i)
 						if strtrim(val) == "" then 
 							self.db.profile.channels[i].empty = true
+						else
+							self.db.profile.channels[i].empty = nil
 						end
 						self.db.profile.channels[i].name = val 
 						self.options.args.channels.args[index].name = string.format("%d. %s", i, self.db.profile.channels[i].name or "")

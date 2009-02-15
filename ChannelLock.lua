@@ -20,6 +20,8 @@ ChannelLock = LibStub("AceAddon-3.0"):NewAddon("ChannelLock", "AceConsole-3.0", 
 ChannelLock.revision = tonumber(("$Revision$"):match("%d+"))
 ChannelLock.date = ("$Date$"):match("%d%d%d%d%-%d%d%-%d%d")
 
+ChannelLock.debug = false
+
 local timerDelay = 1
 
 local TRADE_CHANNEL_NAME = "Trade - City"
@@ -98,7 +100,9 @@ function ChannelLock:CheckChannels()
 		end
 	end
 
-	self.processingTimer = self:ScheduleRepeatingTimer("ProcessUpdatesQueue", timerDelay)
+	if not self.debug then
+		self.processingTimer = self:ScheduleRepeatingTimer("ProcessUpdatesQueue", timerDelay)
+	end
 end
 
 function ChannelLock:ProcessUpdatesQueue()
