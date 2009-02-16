@@ -82,6 +82,12 @@ function ChannelLock:GetOptions()
 		options.args.channels.args[tostring(i)] = argblock
 	end
 
+	local helptext = {
+		type = "description",
+		name = "You must reload ui (/console reloadui) after making changes on this screen.",
+	}
+	table.insert(options.args.channels.args, helptext)
+
 	return options
 end
 

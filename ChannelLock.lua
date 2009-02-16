@@ -25,6 +25,8 @@ ChannelLock.debug = false
 local timerDelay = 1
 
 local TRADE_CHANNEL_NAME = "Trade - City"
+local LFG_CHANNEL_NAME = "LookingForGroup"
+
 local debugf = tekDebug and tekDebug:GetFrame("ChannelLock")
 
 local knownTradeZones = {
@@ -74,7 +76,10 @@ end
 
 -- TODO: We really need to compare slot, name and frameIndex to build the right command queue
 function ChannelLock:CheckChannels()
+	local lfgid, lfgname = GetChannelName(LFG_CHANNEL_NAME)
+	local tradeid, tradename = GetChannelName(TRADE_CHANNEL_NAME) -- TODO
 	local myChannels = self.db.profile.channels
+
 	for i = 1,10 do
 		local id, name = GetChannelName(i)
 		name = self:CleanChannelName(name)
@@ -86,13 +91,15 @@ function ChannelLock:CheckChannels()
 				end
 				table.insert(self.commandQueue, { action="join", id = i, name = myChannels[i].name, frameIndex = myChannels[i].frameIndex })
 			else
-				-- Always add to frame... maybe this will help...
+				-- Always add to frame...
 				table.insert(self.commandQueue, { action="addtoframe", id=i, name=myChannels[i].name, frameIndex=myChannels[i].frameIndex } )
 			end
 		else
 			-- There should be nothing in this slot, remove it, add a stub and schedule the stub removal
 			if id > 0 and name then
 				table.insert(self.commandQueue, { action = "leave", id = i, name=name })
+			elseif lfgname and i == lfgid then
+				table.insert(self.commandQueue, { action = "leave", id = i, name = lfgname })
 			end
 
 			table.insert(self.commandQueue, { action = "join", id = i, name = "QCHANNEL"..i, frameIndex=1 })
@@ -113,8 +120,8 @@ function ChannelLock:ProcessUpdatesQueue()
 			self.deferredCommands = nil
 			item = table.remove(self.commandQueue, 1)
 		else
-			self:Print("Channel setup complete! You are ready to go.")
 			self:CancelTimer(self.processingTimer)
+			self:Print("Channel setup complete! You are ready to go.")
 			return
 		end
 	end
@@ -145,11 +152,12 @@ function ChannelLock:JoinChannel(channel, frameIndex)
 	if not frameIndex then return end
 	local frame = _G["ChatFrame"..frameIndex]
 
+	-- We can use something like this to prevent the "Joining" and "Leaving" messages
 	-- ChatFrame_AddMessageEventFilter("CHAT_MSG_CHANNEL_NOTICE", NoopFilter)
 
-	if channel == "LookingForGroup" then SetLookingForGroup(3,5,3) end
+	if channel == LFG_CHANNEL_NAME then SetLookingForGroup(3,5,1) end
 	JoinPermanentChannel(channel, nil, frameIndex, nil)
-	if channel == "LookingForGroup" then ClearLookingForGroup() end
+	if channel == LFG_CHANNEL_NAME then ClearLookingForGroup() end
 
 	-- ChatFrame_RemoveMessageEventFilter("CHAT_MSG_CHANNEL_NOTICE", NoopFilter)
 end
@@ -158,13 +166,13 @@ function ChannelLock:LeaveChannel(channel, frameIndex)
 	if not channel then return end
 	if not frameIndex then frameIndex = 1 end
 
-	if channel == "LookingForGroup" then SetLookingForGroup(3, 5, 3) end
+	if channel == LFG_CHANNEL_NAME then SetLookingForGroup(3, 5, 3) end
 	if channel == TRADE_CHANNEL_NAME and not knownTradeZones(GetZoneText) then
 		self:Debug( "LeaveChannel - Unable to drop the Trade channel because you are not in a trade zone.")
 	end
 
 	LeaveChannelByName(channel);
 
-	if channel == "LookingForGroup" then ClearLookingForGroup() end
+	if channel == LFG_CHANNEL_NAME then ClearLookingForGroup() end
 end
 
