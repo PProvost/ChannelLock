@@ -79,17 +79,17 @@ function ChannelLock:GetOptions()
 				}
 			}
 		}
-		options.args.channels.args[tostring(i)] = argblock
+		options.args.channels.args["Channel"..tostring(i)] = argblock
 	end
 
 	local rescanButton = {
 		type = "execute",
 		name = "Apply Changes",
 		order = 99,
-		description = "Rescans the current channels, applying any changes made here.",
+		desc = "Rescans the current channels, applying any changes made here.",
 		func = function() ChannelLock:CheckChannels() end,
 	}
-	table.insert(options.args.channels.args,rescanButton)
+	options.args.channels.args["rescanButton"] = rescanButton
 
 	return options
 end
