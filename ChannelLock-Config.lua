@@ -88,6 +88,15 @@ function ChannelLock:GetOptions()
 	}
 	table.insert(options.args.channels.args, helptext)
 
+	local rescanButton = {
+		type = "execute",
+		name = "Apply Changes",
+		order = 99,
+		description = "Rescans the current channels, applying any changes made here.",
+		func = function() ChannelLock:CheckChannels() end,
+	}
+	table.insert(options.args.channels.args,rescanButton)
+
 	return options
 end
 

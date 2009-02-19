@@ -74,65 +74,112 @@ function ChannelLock:DebugF(...)
 	end
 end
 
--- TODO: We really need to compare slot, name and frameIndex to build the right command queue
-function ChannelLock:CheckChannels()
-	local lfgid, lfgname = GetChannelName(LFG_CHANNEL_NAME)
-	local tradeid, tradename = GetChannelName(TRADE_CHANNEL_NAME) -- TODO
-	local myChannels = self.db.profile.channels
+function ChannelLock:IsTradeChannelAndNotTradeZone(channel)
+	local currentZone = GetRealZoneText()
+	return channel == TRADE_CHANNEL_NAME and not knownTradeZones[currentZone]
+end
+
+function ChannelLock:MakeCommandQueue(source, goal) 
+	local commandQueue = {} 
+	local removalQueue = {} 
+
+	for i = 1, #source do 
+		if source[i].name ~= goal[i].name and not source[i].empty and not self:IsTradeChannelAndNotTradeZone(source[i].name) then 
+			if source[i].name == LFG_CHANNEL_NAME then table.insert(commandQueue, { action="set_lfg" }) end
+			table.insert(commandQueue, { action="remove", val=source[i].name }) 
+			if source[i].name == LFG_CHANNEL_NAME then table.insert(commandQueue, { action="clear_lfg" }) end
+		end 
+	end 
+
+	for i = 1, #source do 
+		if goal[i].empty then 
+			if self:IsTradeChannelAndNotTradeZone(source[i].name) then
+				table.insert(commandQueue, { action="warning", val="Unable to leave Trade channel because you are not in a trade zone." })
+			else
+				table.insert(commandQueue, { action="add", val="temp"..i }) 
+				table.insert(removalQueue, { action="remove", val="temp"..i }) 
+			end
+		elseif (source[i].name ~= goal[i].name) and not goal[i].empty then 
+			if self:IsTradeChannelAndNotTradeZone(source[i].name) then
+				table.insert(commandQueue, { action="warning", val="Unable to replace Trade channel because you are in a trade zone." })
+			else
+				table.insert(commandQueue, { action="add", val=goal[i].name }) 
+			end
+		end 
+	end 
+
+	for i = 1, #removalQueue do 
+		table.insert(commandQueue, removalQueue[i]) 
+	end 
+
+	return commandQueue 
+end  
+
+function ChannelLock:GetSourceList()
+	local source = {}
 
 	for i = 1,10 do
 		local id, name = GetChannelName(i)
 		name = self:CleanChannelName(name)
-		if myChannels[i] and myChannels[i].name and not myChannels[i].empty then
-			if myChannels[i].name ~= name then
-				-- The wrong channel is in this slot, remove it before adding the correct one
-				if name then
-					table.insert(self.commandQueue, { action="leave", id = i, name=name })
-				end
-				table.insert(self.commandQueue, { action="join", id = i, name = myChannels[i].name, frameIndex = myChannels[i].frameIndex })
-			else
-				-- Always add to frame...
-				table.insert(self.commandQueue, { action="addtoframe", id=i, name=myChannels[i].name, frameIndex=myChannels[i].frameIndex } )
-			end
-		else
-			-- There should be nothing in this slot, remove it, add a stub and schedule the stub removal
-			if id > 0 and name then
-				table.insert(self.commandQueue, { action = "leave", id = i, name=name })
-			elseif lfgname and i == lfgid then
-				table.insert(self.commandQueue, { action = "leave", id = i, name = lfgname })
-			end
 
-			table.insert(self.commandQueue, { action = "join", id = i, name = "QCHANNEL"..i, frameIndex=1 })
-			table.insert(self.deferredCommands, { action = "leave", id = i, name = "QCHANNEL"..i } )
+		if not name then
+			source[i] = { empty = true }
+		else
+			source[i] = { name = name }
 		end
 	end
 
-	if not self.debug then
-		self.processingTimer = self:ScheduleRepeatingTimer("ProcessUpdatesQueue", timerDelay)
+	local lfgid, lfgname = GetChannelName(LFG_CHANNEL_NAME)
+	local tradeid, tradename = GetChannelName(TRADE_CHANNEL_NAME) 
+
+	if lfgname then
+		source[lfgid] = { name = lfgname }
+	end
+	if tradename then
+		source[tradeid] = { name = tradename }
+	end
+
+	return source
+end
+
+function ChannelLock:CheckChannels()
+	local goal = self.db.profile.channels
+	local source = self:GetSourceList()
+	self.commandQueue = self:MakeCommandQueue(source, goal)
+	self.processingTimer = self:ScheduleRepeatingTimer("PopCommand", timerDelay)
+end
+
+function ChannelLock:HandleCommand(cmd)
+	if cmd.action == "add" then
+		self:JoinChannel(cmd.val, 1)
+	elseif cmd.action == "remove" then
+		self:LeaveChannel(cmd.val)
+	elseif cmd.action == "set_lfg" then
+		SetLookingForGroup(3,5,1)
+	elseif cmd.action == "clear_lfg" then
+		SetLookingForGroup(3,1,1)
+	elseif cmd.action == "warning" then
+		self:Print("Warning - " .. cmd.val)
+	else
+		self:Debug("Unknown command: " .. cmd.action)
 	end
 end
 
-function ChannelLock:ProcessUpdatesQueue()
-	local item = table.remove(self.commandQueue, 1)
-	if not item then
-		if self.deferredCommands then
-			self.commandQueue = self.deferredCommands
-			self.deferredCommands = nil
-			item = table.remove(self.commandQueue, 1)
-		else
-			self:CancelTimer(self.processingTimer)
-			self:Print("Channel setup complete! You are ready to go.")
-			return
+function ChannelLock:PopCommand()
+	local command = nil
+	for i,v in ipairs(self.commandQueue) do
+		if not v.popped then
+			command = v
+			break
 		end
 	end
 
-	if item.action == "join" then
-		self:JoinChannel(item.name, item.frameIndex)
-		table.insert(self.commandQueue, { action="addtoframe", id=item.id, name=item.name, frameIndex=item.frameIndex } )
-	elseif item.action == "addtoframe" then
-		ChatFrame_AddChannel(_G["ChatFrame"..item.frameIndex], item.name)
-	elseif item.action == "leave" then
-		self:LeaveChannel(item.name, item.frameIndex)
+	if command then
+		command.popped = true
+		self:HandleCommand(command)
+	else
+		self:CancelTimer(self.processingTimer)
+		self:Print("Channel setup complete! You are ready to go.")
 	end
 end
 
@@ -149,16 +196,12 @@ end
 local function NoopFilter() return true end
 
 function ChannelLock:JoinChannel(channel, frameIndex)
-	if not frameIndex then return end
-	local frame = _G["ChatFrame"..frameIndex]
+	if not channel then return end
+	if not frameIndex then frameIndex = 1 end
 
-	-- We can use something like this to prevent the "Joining" and "Leaving" messages
+	-- We may be able to use something like this to prevent the "Joining" and "Leaving" messages
 	-- ChatFrame_AddMessageEventFilter("CHAT_MSG_CHANNEL_NOTICE", NoopFilter)
-
-	if channel == LFG_CHANNEL_NAME then SetLookingForGroup(3,5,1) end
 	JoinPermanentChannel(channel, nil, frameIndex, nil)
-	if channel == LFG_CHANNEL_NAME then ClearLookingForGroup() end
-
 	-- ChatFrame_RemoveMessageEventFilter("CHAT_MSG_CHANNEL_NOTICE", NoopFilter)
 end
 
@@ -166,13 +209,9 @@ function ChannelLock:LeaveChannel(channel, frameIndex)
 	if not channel then return end
 	if not frameIndex then frameIndex = 1 end
 
-	if channel == LFG_CHANNEL_NAME then SetLookingForGroup(3, 5, 3) end
-	if channel == TRADE_CHANNEL_NAME and not knownTradeZones(GetZoneText) then
-		self:Debug( "LeaveChannel - Unable to drop the Trade channel because you are not in a trade zone.")
-	end
-
+	-- We may be able to use something like this to prevent the "Joining" and "Leaving" messages
+	-- ChatFrame_AddMessageEventFilter("CHAT_MSG_CHANNEL_NOTICE", NoopFilter)
 	LeaveChannelByName(channel);
-
-	if channel == LFG_CHANNEL_NAME then ClearLookingForGroup() end
+	-- ChatFrame_RemoveMessageEventFilter("CHAT_MSG_CHANNEL_NOTICE", NoopFilter)
 end
 
