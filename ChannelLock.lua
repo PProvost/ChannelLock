@@ -111,7 +111,9 @@ function ChannelLock:MakeCommandQueue(source, goal)
 			if self:IsTradeChannelAndNotTradeZone(source[i].name) then
 				table.insert(commandQueue, { action="warning", message="Unable to replace Trade channel because you are in a trade zone." })
 			else
+				if goal[i].name == LFG_CHANNEL_NAME then table.insert(commandQueue, { action="set_lfg" }) end
 				table.insert(commandQueue, { action="join", channelName=goal[i].name, frameIndex=goal.frameIndex }) 
+				if goal[i].name == LFG_CHANNEL_NAME then table.insert(commandQueue, { action="clear_lfg" }) end
 			end
 		end 
 	end 
@@ -151,7 +153,7 @@ function ChannelLock:GetSourceList()
 		source[lfgid] = { name = lfgname }
 	end
 	if tradename then
-		source[tradeid] = { name = tradename }
+		source[tradeid] = { name = "Trade" }
 	end
 
 	return source

@@ -16,7 +16,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ]]
 
-assert(ChannelLock)
+if not ChannelLock then return end
+
 
 function ChannelLock:GetOptions()
 	local options = {
@@ -45,15 +46,27 @@ function ChannelLock:GetOptions()
 					type = 'input',
 					name = 'Channel Name',
 					desc = "The channel name for this slot",
+					validate = function(info,val)
+						val = strtrim(val)
+						for j = 1,10 do
+							if j ~= i and self.db.profile.channels[j].name == val then
+								return "You can not set two slots to the same value. Please clear the other one first."
+							end	
+						end
+						return true
+					end,
 					get = function() return self.db.profile.channels[i].name end,
 					set = function(info, val) 
-						-- TODO - add the command the queue and fire the processor
+						val = strtrim(val)
 						local index = tostring(i)
-						if strtrim(val) == "" then 
+						if val == "" then 
+							self.db.profile.channels[i].name = nil
+							self.db.profile.channels[i].frameIndex = nil
 							self.db.profile.channels[i].empty = true
 						else
 							self.db.profile.channels[i].empty = nil
 						end
+
 						self.db.profile.channels[i].name = val 
 						self.options.args.channels.args[index].name = string.format("%d. %s", i, self.db.profile.channels[i].name or "")
 					end,
@@ -79,7 +92,7 @@ function ChannelLock:GetOptions()
 				}
 			}
 		}
-		options.args.channels.args["Channel"..tostring(i)] = argblock
+		options.args.channels.args[tostring(i)] = argblock
 	end
 
 	local rescanButton = {
