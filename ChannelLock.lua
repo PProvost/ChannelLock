@@ -46,12 +46,20 @@ function ChannelLock:OnInitialize()
 	self.defaults = self:GetDefaults()
 	self.db = LibStub("AceDB-3.0"):New("ChannelLockDB", self.defaults, "Default")
 
+	LibStub("tekKonfig-AboutPanel").new(nil, "ChannelLock")
 
 	self.options = self:GetOptions()
 	LibStub("AceConfig-3.0"):RegisterOptionsTable("ChannelLock", self.options )
-	LibStub("tekKonfig-AboutPanel").new(nil, "ChannelLock")
 	LibStub("AceConfigDialog-3.0"):AddToBlizOptions("ChannelLock", "Channels", "ChannelLock", "channels")
 	LibStub("AceConfigDialog-3.0"):AddToBlizOptions("ChannelLock", "Profiles", "ChannelLock", "profiles")
+
+
+	self:RegisterChatCommand("channellock", "OpenConfig")
+	self:RegisterChatCommand("cl", "OpenConfig")
+end
+
+function ChannelLock:OpenConfig()
+	InterfaceOptionsFrame_OpenToCategory("ChannelLock")
 end
 
 function ChannelLock:OnEnable()
@@ -81,12 +89,12 @@ end
 
 function ChannelLock:MakeCommandQueue(source, goal) 
 	local commandQueue = {} 
-	local removalQueue = {} 
+	local cleanupQueue = {} 
 
 	for i = 1, #source do 
 		if source[i].name ~= goal[i].name and not source[i].empty and not self:IsTradeChannelAndNotTradeZone(source[i].name) then 
 			if source[i].name == LFG_CHANNEL_NAME then table.insert(commandQueue, { action="set_lfg" }) end
-			table.insert(commandQueue, { action="remove", val=source[i].name }) 
+			table.insert(commandQueue, { action="leave", channelName=source[i].name }) 
 			if source[i].name == LFG_CHANNEL_NAME then table.insert(commandQueue, { action="clear_lfg" }) end
 		end 
 	end 
@@ -94,23 +102,30 @@ function ChannelLock:MakeCommandQueue(source, goal)
 	for i = 1, #source do 
 		if goal[i].empty then 
 			if self:IsTradeChannelAndNotTradeZone(source[i].name) then
-				table.insert(commandQueue, { action="warning", val="Unable to leave Trade channel because you are not in a trade zone." })
+				table.insert(commandQueue, { action="warning", message="Unable to leave Trade channel because you are not in a trade zone." })
 			else
-				table.insert(commandQueue, { action="add", val="temp"..i }) 
-				table.insert(removalQueue, { action="remove", val="temp"..i }) 
+				table.insert(commandQueue, { action="join", channelName="temp"..i, frameIndex=goal.frameIndex }) 
+				table.insert(cleanupQueue, { action="leave", channelName="temp"..i }) 
 			end
 		elseif (source[i].name ~= goal[i].name) and not goal[i].empty then 
 			if self:IsTradeChannelAndNotTradeZone(source[i].name) then
-				table.insert(commandQueue, { action="warning", val="Unable to replace Trade channel because you are in a trade zone." })
+				table.insert(commandQueue, { action="warning", message="Unable to replace Trade channel because you are in a trade zone." })
 			else
-				table.insert(commandQueue, { action="add", val=goal[i].name }) 
+				table.insert(commandQueue, { action="join", channelName=goal[i].name, frameIndex=goal.frameIndex }) 
 			end
 		end 
 	end 
 
-	for i = 1, #removalQueue do 
-		table.insert(commandQueue, removalQueue[i]) 
+	for i = 1,#cleanupQueue do 
+		table.insert(commandQueue, cleanupQueue[i]) 
 	end 
+
+	for i = 1,#goal do
+		if not goal[i].empty then
+			local frameIndex = goal[i].frameIndex or 1
+			table.insert(commandQueue, { action="setframe", frameIndex=frameIndex, channelName=goal[i].name })
+		end
+	end
 
 	return commandQueue 
 end  
@@ -150,16 +165,19 @@ function ChannelLock:CheckChannels()
 end
 
 function ChannelLock:HandleCommand(cmd)
-	if cmd.action == "add" then
-		self:JoinChannel(cmd.val, 1)
-	elseif cmd.action == "remove" then
-		self:LeaveChannel(cmd.val)
+	if cmd.action == "join" then
+		self:JoinChannel(cmd.channelName, cmd.frameIndex)
+	elseif cmd.action == "leave" then
+		self:LeaveChannel(cmd.channelName)
 	elseif cmd.action == "set_lfg" then
 		SetLookingForGroup(3,5,1)
 	elseif cmd.action == "clear_lfg" then
 		SetLookingForGroup(3,1,1)
 	elseif cmd.action == "warning" then
-		self:Print("Warning - " .. cmd.val)
+		self:Print("Warning - " .. cmd.message)
+	elseif cmd.action == "setframe" then
+		local frame = getglobal("ChatFrame"..cmd.frameIndex)
+		ChatFrame_AddChannel(frame, cmd.channelName)
 	else
 		self:Debug("Unknown command: " .. cmd.action)
 	end
