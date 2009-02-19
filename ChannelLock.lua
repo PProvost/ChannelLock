@@ -121,7 +121,7 @@ function ChannelLock:MakeCommandQueue(source, goal)
 	end 
 
 	for i = 1,#goal do
-		if not goal[i].empty then
+		if not goal[i].empty and goal[i].name then
 			local frameIndex = goal[i].frameIndex or 1
 			table.insert(commandQueue, { action="setframe", frameIndex=frameIndex, channelName=goal[i].name })
 		end
