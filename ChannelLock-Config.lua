@@ -49,8 +49,8 @@ function ChannelLock:GetOptions()
 					validate = function(info,val)
 						val = strtrim(val)
 						for j = 1,10 do
-							if j ~= i and self.db.profile.channels[j].name == val then
-								return "You can not set two slots to the same value. Please clear the other one first."
+							if val ~= "" and j ~= i and self.db.profile.channels[j].name == val then
+								return false --"You can not set two slots to the same value. Please clear the other one first."
 							end	
 						end
 						return true
