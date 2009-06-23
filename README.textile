@@ -1,0 +1,31 @@
+h2. About ChannelLock
+
+Have you ever found that the channels you're joined to changes without any rhyme or reason? Or that 
+you log over to another toon and don't have the channels you had on your main? Or maybe they change 
+channel numbers and what used to be in /4 is now in /5?
+
+ChannelLock was created to solve these problems. You simply provide the channel names and associated 
+chat frames and it does the rest.
+
+h2. Slash Commands
+
+|*Slash Command*|*Description*|
+|/channellock|Opens the ChannelLock configuration screen|
+|/cl|Same as /channellock|
+
+h2. Trade and LookingForGroup Channels
+
+One thing to note is that WoW treats some channels in a special way, which can create problems for 
+ChannelLock. Special channels are those channels that can take up a slot in your channel list, but 
+not actually be active channels.
+
+The Trade channel, for example, is only active when you are in a trade zone (e.g. a city). The game APIs 
+don't let me leave or join Trade, therefore, unless you are in a city. When ChannelLock runs into this 
+issue, it will present a message telling you that it can't drop or replace Trade on that slot. To fix it, 
+go to a trade zone and re-apply the ChannelLock settings in the configuration screen.
+
+Another special channel is the LookingForGroup channel. This channel is only active when you are active 
+in the in-game LFG system. When ChannelLock is asked to add or remove you from this channel, it will 
+temporarily setup the in-game LFG system, make the channel change and then remove the change to LFG. This 
+should work, but it may end up changing your LFG settings if you had something previously set up there.
+
