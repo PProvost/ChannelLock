@@ -46,28 +46,30 @@ function ChannelLockTests:setUp()
 	end
 end
 
-local channels = {}
-
-_G["GetChannelName"] = function(id)
-	if channels[id] then
-		return unpack(channels[id])
-	else
-		return 0, nil
-	end
+function ChannelLockTests:test_CleanChannelName()
+	assertEquals( ChannelLock:CleanChannelName(nil), nil )
+	assertEquals( ChannelLock:CleanChannelName("Icecrown"), "Icecrown" )
+	assertEquals( ChannelLock:CleanChannelName("Trade (City)"), "Trade" )
 end
 
-function ChannelLockTests:test_DBStuff()
-	channels = {
+function ChannelLockTests:test_GetSourceList()
+	WowStubs.channels = {
 		[1] = { 1, "General" },
-		[2] = { 2, "Trade" },
-		[3] = { 3, "Somecrap" },
+		[2] = { 2, "Trade" } ,
+		[5] = { 5, "DBAOF" },
 	}
 
-	ChannelLock:CheckChannels()
+	local source = ChannelLock:GetSourceList()
 
-	print( table.to_string(ChannelLock.channelUpdates) )
-	print( table.to_string(ChannelLock.stubs) )
+	assertEquals( source[1].name, "general" )
+	assertEquals( source[2].name, "trade" )
+	assertEquals( source[5].name, "dbaof" )
 end
 
+function ChannelLockTests:test_MakeCommandQueue()
+	assert(false)
+end
+
+--- GO!!
 LuaUnit:run('ChannelLockTests')
 

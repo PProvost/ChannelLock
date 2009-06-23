@@ -1,3 +1,6 @@
+-- Set this to true to debug loader issues
+local verbose = nil
+
 function parseargs(s)
   local arg = {}
   string.gsub(s, "(%w+)=([\"'])(.-)%2", function (w, _, a)
@@ -73,12 +76,12 @@ end
 
 function loadLuaFile(path)
 	path = string.gsub(path, "^(.*)\.lua$", "%1")
-	print("Loading " .. path)
+	if (verbose) then print("Loading " .. path) end
 	require(path)
 end
 
 function loadWowXml(path)
-	print("Parsing "..path)
+	if (verbose) then print("Parsing "..path) end
 
 	local xmlstr = readfile(path)
 	if not xmlstr then return end
@@ -90,7 +93,6 @@ function loadWowXml(path)
 
 	local basepath = path:gsub("^(.*)\\[^\\]*$","%1\\")
 	for i,v in ipairs(root) do
-		-- print( string.format("i,v = %d,%s", i, tostring(v)))
 		if root[i].label then
 			if root[i].label == "Script" then
 				loadLuaFile(basepath .. v.xarg.file)

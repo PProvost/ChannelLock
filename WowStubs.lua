@@ -1,19 +1,20 @@
+-- Set this to true to debug stub issues
+local verbose = nil
+
+--[[
+-- PRIVATE IMPLEMNENTATION HELPER CRAP
+--]]
+
 WowStubs = {}
 WowStubs.eventMap = {}
 WowStubs.frames = {}
 WowStubs.isLoggedIn = nil
 WowStubs.currentTime = nil
-
--- Provide a default implementation of geterrorhandler() as provided by Wow
-function geterrorhandler()
-	return function(err) 
-		print("ERROR - " .. err) 
-	end
-end
+WowStubs.channels = {}
 
 function WowStubs:CallFrameScript(frame, script, ...)
 	if frame.scripts[script] then 
-		print("Calling " .. script .. " on " .. tostring(frame.name))
+		if (verbose) then print("Calling " .. script .. " on " .. tostring(frame.name)) end
 		pcall( frame.scripts[script], frame, ... )
 	end
 end
@@ -29,6 +30,18 @@ function WowStubs:OnUpdate(elapsed)
 	if not elapsed then elapsed = 1000 end
 	for i,frame in ipairs(self.frames) do
 		self:CallFrameScript(frame, "OnUpdate", elapsed)
+	end
+end
+
+--[[
+-- GLOBAL IMPLEMENTATIONS OF WOW FUNCTIONS
+--]]
+
+SlashCmdList = {}
+
+function geterrorhandler()
+	return function(err) 
+		print("ERROR - " .. err) 
 	end
 end
 
@@ -76,10 +89,38 @@ function CreateFrame(type, name, template)
 	return frame
 end
 
+function GetChannelName(id)
+	if WowStubs.channels[id] then
+		return unpack(WowStubs.channels[id])
+	else
+		return 0, nil
+	end
+end
+
+function LeaveChannelByName(name)
+	for i = 1,10 do
+		local id, name = WowStubs.channels[i]
+		if id then
+			WowStubs.channels[i] = nil
+		end
+	end
+end
+
+-- Monkey patch JoinPermanentChannel to use the local channels array
+function JoinPermanentChannel(name)
+	for i = 1,10 do
+		if WowStubs.channels[i] == nil then
+			WowStubs.channels[i] = { i, name }
+		end
+	end
+end
+
+
+
 function GetRealmName() return "Dragonblight" end
+function GetRealZoneText() return "Dalaran" end
 function GetLocale() return "enUS" end
 function GetTime() return WowStubs.currentTime or os.time() end
-function GetChannelName(id) return 0, nil end
 function IsLoggedIn() return WowStubs.isLoggedIn end
 function InterfaceOptions_AddCategory(frame) end
 function UnitName(unit) return "Quaiche" end

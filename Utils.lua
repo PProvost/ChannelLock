@@ -28,7 +28,8 @@ local function to_string(data, indent)
             end 
         end 
     else 
-        print_debug(1, "Error: unknown data type: %s", type(data)) 
+        print(string.format("Error: unknown data type: %s", type(data)))
+				print(debugstack())
     end 
 
     return str 

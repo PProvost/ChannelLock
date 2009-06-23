@@ -17,8 +17,8 @@ limitations under the License.
 ]]
 
 ChannelLock = LibStub("AceAddon-3.0"):NewAddon("ChannelLock", "AceConsole-3.0", "AceTimer-3.0")
-ChannelLock.revision = tonumber(("$Revision$"):match("%d+"))
-ChannelLock.date = ("$Date$"):match("%d%d%d%d%-%d%d%-%d%d")
+ChannelLock.revision = tonumber(("$Revision: 27 $"):match("%d+"))
+ChannelLock.date = ("$Date: 2009-02-19 12:21:51 -0700 (Thu, 19 Feb 2009) $"):match("%d%d%d%d%-%d%d%-%d%d")
 
 ChannelLock.debug = false
 
@@ -142,7 +142,7 @@ function ChannelLock:GetSourceList()
 		if not name then
 			source[i] = { empty = true }
 		else
-			source[i] = { name = name }
+			source[i] = { name = string.lower(name) }
 		end
 	end
 

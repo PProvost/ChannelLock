@@ -1,11 +1,11 @@
-## Interface: 30000
+## Interface: 30100
  
 ## Title: ChannelLock
 ## Notes: A chat channel manager.
 ## Author: Quaiche
 ## Version: 1.0
 ## X-Category: Chat
-## OptionalDeps: tekDebug
+## OptionalDeps: Ace3,tekDebug
 ## SavedVariables: ChannelLockDB
 
 libs\LibStub\LibStub.lua
