@@ -62,11 +62,9 @@ function ChannelLock:OnEnable()
 	-- Clean up database
 	local channels = self.db.profile.channels
 	for i = 1,10 do
-		if channels[i].name == nil then
+		if channels[i].name == nil or channels[i].name == "" or channels[i].empty then
 			channels[i].name = ""
-			if channels[i].empty ~= true then
-				channels[i].empty = nil
-			end
+			channels[i].empty = true
 		end
 	end
 
@@ -140,6 +138,18 @@ function ChannelLock:DropTempChannels()
 	for i,name in ipairs(self.tempChannels) do
 		self:LeaveChannel(name)
 	end
+	self:ScheduleTimer("SetupChannelFrames", 2.0)
+end
+
+function ChannelLock:SetupChannelFrames()
+	local channels = self.db.profile.channels
+	for i = 1,10 do
+		if not channels[i].empty then
+			if not channels[i].frameIndex then channels[i].frameIndex = 1 end
+			ChatFrame_AddChannel(_G["ChatFrame"..channels[i].frameIndex], channels[i].name)
+		end
+	end
+		
 	self:Print("Channels now setup correctly. Enjoy!")
 end
 
@@ -173,6 +183,8 @@ function ChannelLock:JoinChannel(channel, frameIndex)
 	if not channel then return end
 	if not frameIndex then frameIndex = 1 end
 	JoinPermanentChannel(channel, nil, frameIndex, nil)
+	-- Damn this is too quick
+	ChatFrame_AddChannel(_G["ChatFrame"..frameIndex], channel)
 end
 
 function ChannelLock:JoinTempChannel(index)
