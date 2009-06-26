@@ -19,10 +19,7 @@ limitations under the License.
 ChannelLock = LibStub("AceAddon-3.0"):NewAddon("ChannelLock", "AceConsole-3.0", "AceTimer-3.0")
 ChannelLock.revision = tonumber(("$Revision: 27 $"):match("%d+"))
 ChannelLock.date = ("$Date: 2009-02-19 12:21:51 -0700 (Thu, 19 Feb 2009) $"):match("%d%d%d%d%-%d%d%-%d%d")
-
-ChannelLock.debug = false
-
-local timerDelay = 1
+ChannelLock.tempChannels = {}
 
 local TRADE_CHANNEL_NAME = "Trade - City"
 local LFG_CHANNEL_NAME = "LookingForGroup"
@@ -53,7 +50,6 @@ function ChannelLock:OnInitialize()
 	LibStub("AceConfigDialog-3.0"):AddToBlizOptions("ChannelLock", "Channels", "ChannelLock", "channels")
 	LibStub("AceConfigDialog-3.0"):AddToBlizOptions("ChannelLock", "Profiles", "ChannelLock", "profiles")
 
-
 	self:RegisterChatCommand("channellock", "OpenConfig")
 	self:RegisterChatCommand("cl", "OpenConfig")
 end
@@ -63,74 +59,24 @@ function ChannelLock:OpenConfig()
 end
 
 function ChannelLock:OnEnable()
-	self.commandQueue = {}
-	self.deferredCommands = {}
-
-	self:Debug( "Enable - Scheduling channel check")
-	self:ScheduleTimer("CheckChannels", timerDelay)
-end
-
-function ChannelLock:Debug(...)
-	if debugf then
-		self:Print(debugf, ...)
+	-- Clean up database
+	local channels = self.db.profile.channels
+	for i = 1,10 do
+		if channels[i].name == nil then
+			channels[i].name = ""
+			if channels[i].empty ~= true then
+				channels[i].empty = nil
+			end
+		end
 	end
-end
 
-function ChannelLock:DebugF(...)
-	if debugf then
-		self:Print(debugf, string.format(...))
-	end
+	self:ScheduleTimer("CheckChannels", 1.0)
 end
 
 function ChannelLock:IsTradeChannelAndNotTradeZone(channel)
 	local currentZone = GetRealZoneText()
 	return channel == TRADE_CHANNEL_NAME and not knownTradeZones[currentZone]
 end
-
-function ChannelLock:MakeCommandQueue(source, goal) 
-	local commandQueue = {} 
-	local cleanupQueue = {} 
-
-	for i = 1, #source do 
-		if source[i].name ~= goal[i].name and not source[i].empty and not self:IsTradeChannelAndNotTradeZone(source[i].name) then 
-			if source[i].name == LFG_CHANNEL_NAME then table.insert(commandQueue, { action="set_lfg" }) end
-			table.insert(commandQueue, { action="leave", channelName=source[i].name }) 
-			if source[i].name == LFG_CHANNEL_NAME then table.insert(commandQueue, { action="clear_lfg" }) end
-		end 
-	end 
-
-	for i = 1, #source do 
-		if goal[i].empty then 
-			if self:IsTradeChannelAndNotTradeZone(source[i].name) then
-				table.insert(commandQueue, { action="warning", message="Unable to leave Trade channel because you are not in a trade zone." })
-			else
-				table.insert(commandQueue, { action="join", channelName="temp"..i, frameIndex=goal.frameIndex }) 
-				table.insert(cleanupQueue, { action="leave", channelName="temp"..i }) 
-			end
-		elseif (source[i].name ~= goal[i].name) and not goal[i].empty then 
-			if self:IsTradeChannelAndNotTradeZone(source[i].name) then
-				table.insert(commandQueue, { action="warning", message="Unable to replace Trade channel because you are in a trade zone." })
-			else
-				if goal[i].name == LFG_CHANNEL_NAME then table.insert(commandQueue, { action="set_lfg" }) end
-				table.insert(commandQueue, { action="join", channelName=goal[i].name, frameIndex=goal.frameIndex }) 
-				if goal[i].name == LFG_CHANNEL_NAME then table.insert(commandQueue, { action="clear_lfg" }) end
-			end
-		end 
-	end 
-
-	for i = 1,#cleanupQueue do 
-		table.insert(commandQueue, cleanupQueue[i]) 
-	end 
-
-	for i = 1,#goal do
-		if not goal[i].empty and goal[i].name then
-			local frameIndex = goal[i].frameIndex or 1
-			table.insert(commandQueue, { action="setframe", frameIndex=frameIndex, channelName=goal[i].name })
-		end
-	end
-
-	return commandQueue 
-end  
 
 function ChannelLock:GetSourceList()
 	local source = {}
@@ -140,9 +86,9 @@ function ChannelLock:GetSourceList()
 		name = self:CleanChannelName(name)
 
 		if not name then
-			source[i] = { empty = true }
+			source[i] = { empty = true, name = "" }
 		else
-			source[i] = { name = string.lower(name) }
+			source[i] = { empty = nil, name = string.lower(name) }
 		end
 	end
 
@@ -150,10 +96,10 @@ function ChannelLock:GetSourceList()
 	local tradeid, tradename = GetChannelName(TRADE_CHANNEL_NAME) 
 
 	if lfgname then
-		source[lfgid] = { name = lfgname }
+		source[lfgid] = { empty = nil, name = lfgname }
 	end
 	if tradename then
-		source[tradeid] = { name = "Trade" }
+		source[tradeid] = { empty = nil, name = "Trade" }
 	end
 
 	return source
@@ -162,45 +108,55 @@ end
 function ChannelLock:CheckChannels()
 	local goal = self.db.profile.channels
 	local source = self:GetSourceList()
-	self.commandQueue = self:MakeCommandQueue(source, goal)
-	self.processingTimer = self:ScheduleRepeatingTimer("PopCommand", timerDelay)
-end
-
-function ChannelLock:HandleCommand(cmd)
-	if cmd.action == "join" then
-		self:JoinChannel(cmd.channelName, cmd.frameIndex)
-	elseif cmd.action == "leave" then
-		self:LeaveChannel(cmd.channelName)
-	elseif cmd.action == "set_lfg" then
-		SetLookingForGroup(3,5,1)
-	elseif cmd.action == "clear_lfg" then
-		SetLookingForGroup(3,1,1)
-	elseif cmd.action == "warning" then
-		self:Print("Warning - " .. cmd.message)
-	elseif cmd.action == "setframe" then
-		local frame = getglobal("ChatFrame"..cmd.frameIndex)
-		ChatFrame_AddChannel(frame, cmd.channelName)
+	if not self:IsChannelListCorrect(source,goal) then
+		self:Print("Your channels appear to need adjustment. One moment please.")
+		self:DropAllChannels()
+		self:ScheduleTimer("JoinAllChannels", 1.0)
 	else
-		self:Debug("Unknown command: " .. cmd.action)
+		self:Print("Your channels are set correctly. No adjustment required.")
 	end
 end
 
-function ChannelLock:PopCommand()
-	local command = nil
-	for i,v in ipairs(self.commandQueue) do
-		if not v.popped then
-			command = v
-			break
+function ChannelLock:JoinAllChannels()
+	local channels = self.db.profile.channels
+	for i = 1,10 do
+		if channels[i].empty then
+			self:JoinTempChannel(i)
+		else
+			self:JoinChannel(channels[i].name, channels[i].frameIndex)
 		end
 	end
+	self:ScheduleTimer("DropTempChannels", 2.0)
+end
 
-	if command then
-		command.popped = true
-		self:HandleCommand(command)
-	else
-		self:CancelTimer(self.processingTimer)
-		self:Print("Channel setup complete! You are ready to go.")
+function ChannelLock:DropAllChannels()
+	for i = 1,10 do
+		local id, name = GetChannelName(i)
+		self:LeaveChannel(name)
 	end
+end
+
+function ChannelLock:DropTempChannels()
+	for i,name in ipairs(self.tempChannels) do
+		self:LeaveChannel(name)
+	end
+	self:Print("Channels now setup correctly. Enjoy!")
+end
+
+function ChannelLock:CompareChannelInfo( source, goal )
+   return (source.empty == goal.empty) and 
+   (string.lower(source.name) == string.lower(goal.name))
+end
+
+function ChannelLock:IsChannelListCorrect(source, goal)
+   local clean = true
+   for i = 1,10 do
+      if not self:CompareChannelInfo(source[i], goal[i]) then
+         clean = false
+         print (i)
+         break
+      end
+   end
 end
 
 -- this reduces server zone channels (general, trade, etc to their base parts with no zone info)
@@ -213,25 +169,20 @@ function ChannelLock:CleanChannelName(channel)
 	return channel;
 end
 
-local function NoopFilter() return true end
-
 function ChannelLock:JoinChannel(channel, frameIndex)
 	if not channel then return end
 	if not frameIndex then frameIndex = 1 end
-
-	-- We may be able to use something like this to prevent the "Joining" and "Leaving" messages
-	-- ChatFrame_AddMessageEventFilter("CHAT_MSG_CHANNEL_NOTICE", NoopFilter)
 	JoinPermanentChannel(channel, nil, frameIndex, nil)
-	-- ChatFrame_RemoveMessageEventFilter("CHAT_MSG_CHANNEL_NOTICE", NoopFilter)
 end
 
-function ChannelLock:LeaveChannel(channel, frameIndex)
-	if not channel then return end
-	if not frameIndex then frameIndex = 1 end
+function ChannelLock:JoinTempChannel(index)
+	local name = "Temp_" .. index
+	self:JoinChannel(name)
+	table.insert(self.tempChannels, name)
+end
 
-	-- We may be able to use something like this to prevent the "Joining" and "Leaving" messages
-	-- ChatFrame_AddMessageEventFilter("CHAT_MSG_CHANNEL_NOTICE", NoopFilter)
+function ChannelLock:LeaveChannel(channel)
+	if not channel then return end
 	LeaveChannelByName(channel);
-	-- ChatFrame_RemoveMessageEventFilter("CHAT_MSG_CHANNEL_NOTICE", NoopFilter)
 end
 
